@@ -1,0 +1,24 @@
+INFO:    Converting OCI blobs to SIF format
+INFO:    Starting build...
+INFO:    Fetching OCI image...
+INFO:    Extracting OCI image...
+2024/07/17 15:58:14  warn xattr{etc/gshadow} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 15:58:14  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/etc/gshadow} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 15:59:44  warn xattr{var/log/apt/term.log} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 15:59:44  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/var/log/apt/term.log} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 16:00:46  warn xattr{var/log/apt/term.log} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 16:00:46  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/var/log/apt/term.log} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 16:01:57  warn xattr{var/log/apt/term.log} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 16:01:57  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/var/log/apt/term.log} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 16:04:59  warn xattr{var/log/apt/term.log} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 16:04:59  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/var/log/apt/term.log} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 16:05:47  warn xattr{var/log/apt/term.log} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 16:05:47  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/var/log/apt/term.log} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 16:05:48  warn xattr{etc/gshadow} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 16:05:48  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/etc/gshadow} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 17:29:43  warn xattr{usr/local/lib/python3.8} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 17:29:43  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/usr/local/lib/python3.8} destination filesystem does not support xattrs, further warnings will be suppressed
+2024/07/17 17:38:24  warn xattr{app/lfs/CHANGELOG.md} ignoring ENOTSUP on setxattr "user.rootlesscontainers"
+2024/07/17 17:38:24  warn xattr{/n/holyscratch01/iaifi_lab/Users/jmicallef/build-temp-2729690544/rootfs/app/lfs/CHANGELOG.md} destination filesystem does not support xattrs, further warnings will be suppressed
+INFO:    Inserting Singularity configuration...
+INFO:    Creating SIF file...
