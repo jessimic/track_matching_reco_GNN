@@ -26,11 +26,13 @@ $ `salloc --job-name=jupyter_lab  --nodes=1   --ntasks=1   --cpus-per-task=1   -
 
 Print out:
 
-$ salloc: Granted job allocation 20007889
-$ salloc: Waiting for resource configuration
-$ salloc: Nodes **holy8a26602** are ready for job
+$ `salloc: Granted job allocation 20007889`
 
-$ `singularity shell /n/holystore01/LABS/iaifi_lab/Users/jmicallef/spine_larcv_ME_cuda_pytorch.sif gnn.py`
+$ `salloc: Waiting for resource configuration`
+
+$ `salloc: Nodes **holy8a26602** are ready for job`
+
+$ `singularity shell /n/holystore01/LABS/iaifi_lab/Users/jmicallef/spine_larcv_ME_cuda_pytorch.sif`
 
 $  `jupyter lab --no-browser --ip=0.0.0.0 --port=8890`
 
