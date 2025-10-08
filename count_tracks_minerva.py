@@ -82,8 +82,10 @@ class Mx2Data:
         
 
 if __name__ == "__main__":
-    larcv_directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/larcv/validation_set/"
-    check_directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/validation_set/"
+    #larcv_directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/larcv/validation_set/"
+    #check_directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/validation_set/"
+    larcv_directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/larcv/"
+    check_directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/"
 
     # List all .root files in the specified directory
     input_files = glob.glob(os.path.join(larcv_directory, "out*.root"))
@@ -128,7 +130,7 @@ print(sum(save_true_num_tracks),sum(save_split_num_tracks),sum(save_connected_nu
 print(sum(save_true_num_tracks)/maxe,sum(save_split_num_tracks)/maxe,sum(save_connected_num_tracks)/maxe)
 print(save_connected_num_tracks.count(0),maxe,max(save_connected_num_tracks),max(save_true_num_tracks),max(save_split_num_tracks))
 
-sample = "test_"
+sample = "train_"
 max_truth = max(save_true_num_tracks)
 plt.figure(figsize=(10,8))
 plt.hist(save_true_num_tracks,bins=max_truth)
