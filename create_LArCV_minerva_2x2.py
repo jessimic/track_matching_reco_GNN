@@ -10,7 +10,7 @@ import random
 import re
 import os,sys
 import yaml
-sys.path.insert(0, '/n/holystore01/LABS/iaifi_lab/Users/jmicallef/spine/')
+sys.path.insert(0, '/sdf/data/neutrino/software/spine/src/')
 
 # Necessary imports
 from spine.driver import Driver
@@ -105,7 +105,7 @@ class Mx2Data:
         for idx in self.trk_index[entry]:        
             n_nodes = self.trk_nodes[entry][idx]
             if ((n_nodes >0)):
-                edep_pdg, edep_traj_name, edep_traj_evtid = get_most_energetic_particle(self, entry, idx)
+                edep_pdg, edep_traj_name, edep_traj_evtid = self.get_most_energetic_particle(entry, idx)
                 unique_id_store.append(edep_traj_evtid)
          
         minerva_vertices = [str(val) for val in set(unique_id_store)]
@@ -251,33 +251,6 @@ class Mx2Data:
                 # fill voxelset 
                 track_as_voxelset2 = larcv.VoxelSet()
 
-                #if any_us and any_ds: #need to split
-                #    #Create new particle for DS
-                #    fragment_id=fragment_counter #ids_shuffled[fragment_counter]
-                #    fragment_counter += 1
-                #    particle2.id(int(fragment_id))
-                #    particle2.group_id(int(group_id)) #Same group
-                #    track_as_voxelset2.id(int(fragment_id))
-                #    #print("Split new Fragment: ", fragment_id, "Group: ", group_id)
-                #    
-                #    flag_ds = 0
-                #    flag_us = 0
-                #    for edepvoxels in range(n_nodes):
-                #        voxelid = vox3dmeta.id( x_nodes[edepvoxels], y_nodes[edepvoxels], z_nodes[edepvoxels] )
-                #        voxel = larcv.Voxel( voxelid )
-                #        if voxelid==larcv.kINVALID_VOXELID: #Skip
-                #            continue
-                #        elif z_nodes[edepvoxels] < 0: #upstream track
-                #            track_as_voxelset.add( voxel )
-                #            flag_us = 1
-                #        elif z_nodes[edepvoxels] > 0: #downstream track
-                #            track_as_voxelset2.add( voxel )
-                #               
-
-                #            flag_ds = 1 
-                    
-                
-                #else: #no split needed
                     
                 for edepvoxels in range(n_nodes):
                     voxelid = vox3dmeta.id( x_nodes[edepvoxels], y_nodes[edepvoxels], z_nodes[edepvoxels] )
@@ -296,23 +269,14 @@ class Mx2Data:
                 entry_particles = self.out_larcv.get_data( "particle", "corrected")
                 entry_particles.append(particle)
 
-                #if any_ds and any_us:
-                #    # add voxelset to container
-                #    vsa.insert( track_as_voxelset2 )
 
-                    # get the cluster3d entry container, by contributing VoxelSetArray and the Voxel3Dmeta
-                #    entry_clust3d = self.out_larcv.get_data( "cluster3d", "pcluster" )
-                #    entry_clust3d.set( vsa, vox3dmeta )
-                    
-                    #get particle container and fill
-                #    entry_particles = self.out_larcv.get_data( "particle", "corrected")
-                #    entry_particles.append(particle2)
                     
         
         return 0
 
     def write_and_close(self):
         self.out_larcv.finalize()
+
 
 def find_2x2_vertices(spine_driver, entry):
     
@@ -347,7 +311,7 @@ def fill_in_nonshared_events(n_array, m_array):
         # Find where to insert the missing number
         insert_pos = next(i for i, val in enumerate(n_array) if val > num)
         filled_n_indices.insert(insert_pos, num)
-        filled_m_indices.insert(insert_pos, m_indices[insert_pos-1]+1)  # or -1, or something meaningful
+        filled_m_indices.insert(insert_pos, m_array[insert_pos-1]+1)  # or -1, or something meaningful
 
     return filled_n_indices, filled_m_indices
 
@@ -361,13 +325,13 @@ def find_vertex_ids_all_events(spine_driver,Mx2Hits):
     #Get all vertices per event
     for i in range(0,total_events_spine):
         #print("ENTRY ", i)
-        min_indices = find_Mx2_vertices(Mx2Hits, i)
+        min_indices = Mx2Hits.find_Mx2_vertices(i)
         minerva_indices_save.append(min_indices)
 
         nd_indices = find_2x2_vertices(spine_driver, i)
         nd_indices_save.append(nd_indices)
     for i in range(total_events_spine,total_events_mx2):
-        min_indices = find_Mx2_vertices(Mx2Hits, i)
+        min_indices = Mx2Hits.find_Mx2_vertices(i)
         minerva_indices_save.append(min_indices)
     
     #Match vertices per event numbers
@@ -387,12 +351,10 @@ def find_vertex_ids_all_events(spine_driver,Mx2Hits):
 
 
 if __name__ == "__main__":
-    directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/"
+    directory = "/sdf/home/j/jessicam/Mx2/data/"
 
-    # extract the 7-digit number (or any sequence of digits)
-
-    training_output = directory+"lar_2x2/larcv/"
-    validation_output = directory+"lar_2x2/larcv/validation_set/"
+    training_output = directory+"larcv/"
+    validation_output = directory+"larcv/validation_set/"
 
     # List all .root files in the specified directory
     training_input_files = glob.glob(os.path.join(directory+"minerva/", "*.root"))
@@ -400,10 +362,11 @@ if __name__ == "__main__":
     all_files = training_input_files + testing_input_files 
     num_training = len(training_input_files)
     #all_files = all_files[:1] 
+    print(training_input_files, len(all_files))
 
-    print("STARTING AT 87nd FILE IN!!!!!!!!!!")
-    for f_id in range(87,88): #len(all_files)):
+    for f_id in range(0,len(all_files)):
         base_name = os.path.basename(all_files[f_id])
+        # extract the 7-digit number (or any sequence of digits)
         match = re.search(r'\.(\d{7})\.', base_name)
         if match:
             filenum = match.group(1)
