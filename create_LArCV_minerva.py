@@ -325,26 +325,26 @@ class Mx2Data:
         self.out_larcv.finalize()
 
 if __name__ == "__main__":
-    directory = "/n/holystore01/LABS/iaifi_lab/Users/jmicallef/data_2x2/minerva/"
+    directory = "/sdf/home/j/jessicam/Mx2/data/"
     training_output = directory+"larcv/"
     validation_output = directory+"larcv/validation_set/"
 
     # List all .root files in the specified directory
-    training_input_files = glob.glob(os.path.join(directory, "*.root"))
-    testing_input_files = glob.glob(os.path.join(directory+"validation_set/", "*.root"))
-    all_files = training_input_files + testing_input_files 
+    training_input_files = glob.glob(os.path.join(directory+"minerva/", "*.root"))
+    #testing_input_files = glob.glob(os.path.join(directory+"validation_set/", "*.root"))
+    all_files = training_input_files #+ testing_input_files 
     num_training = len(training_input_files)
-    #all_files = all_files[:1] 
+    all_files = all_files[:1] 
 
-    print("STARTING AT 82nd FILE IN!!!!!!!!!!")
-    for f_id in range(82,len(all_files)):
+    #print("STARTING AT 82nd FILE IN!!!!!!!!!!")
+    for f_id in range(0,2): #len(all_files)):
         base_name = os.path.basename(all_files[f_id])
 
         if f_id < num_training:
-            output_file = os.path.join(training_output, f"out_{base_name}")
+            output_file = os.path.join(training_output, f"test_out_{base_name}")
             training_bool = True
         else:
-            output_file = os.path.join(validation_output, f"out_{base_name}")
+            output_file = os.path.join(validation_output, f"test_out_{base_name}")
             training_bool = False
 
         print(base_name, output_file)
