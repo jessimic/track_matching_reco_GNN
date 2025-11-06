@@ -2,8 +2,19 @@
 
 Matching tracks. Project started by Nathanial at https://github.com/ndsantia/mlrecodune/tree/main
 
+## Code Overview:
+- explore_simulation_MINERvA_2x2.ipynb: Plot and explore event displays including 2x2
+- explore_simulation_MINERvA_only.ipynb: Plot and explore MINERvA displays only
+- create_LArCV_minerva.py: rewritten create_minerva_GNN_input.py, paired down to essentials (by Jessie).
+- create_minerva_GNN_input.py: OLDER. Takes in MINERvA DST files and creates LArCV output files, used for the GNN input
+- gnn.py: Calls the GNN (written by Nate).
+- loop_validation.sh: example how to call the validation to run over all the saved training weight iterations.
+- configs: stores the configuration files for training, validating, and writing output file for validation
+- GNN_training_testing_curves.ipynb: Takes the log outputs (from training and validating) to make plots vs. iteration (or epoch). Also writes output file for all the entries once you choose the best validation iteration.
+- Plotting_validation_Mx2.ipynh: Takes the hdf5 file written and looks at the overall confusion matrix along with single event plots showing "how correct" the network is per event.
+
 ## Container
-Use singularity container to run SPINE, per their instructions (https://github.com/DeepLearnPhysics/spine). One is stored on the Harvard cluster at `/n/holystore01/LABS/iaifi_lab/Users/jmicallef/spine_larcv_ME_cuda_pytorch.sif`. Example of how to pull your own singularity (if on a different cluster) at `jobs/pull_singularity.sh`.
+Use singularity container to run SPINE and all above scripts, per their instructions (https://github.com/DeepLearnPhysics/spine). One is stored on the Harvard cluster at `/n/holystore01/LABS/iaifi_lab/Users/jmicallef/spine_larcv_ME_cuda_pytorch.sif`. Example of how to pull your own singularity (if on a different cluster) at `jobs/pull_singularity.sh`.
 
 ## Running GNN for Training and Inference
 --> Make sure your config file is set up inside the config folder and your `gnn.py` is pointing to it
@@ -61,9 +72,3 @@ Use the link inside the `jupter_\*.log` and put that into your computer's web br
 - Add `--gres=gpu:1` to job request
 - Add `--nv` before `.sif` path in singularity call
 
-## Code Overview:
-- explore_simulation_MINERvA_2x2.ipynb: Plot and explore event displays
-- create_minerva_GNN_input.py: Takes in MINERvA DST files and creates LArCV output files, used for the GNN input
-- gnn.py: Calls the GNN
-- configs: stores the configuration files for training, validating, and writing output file for validation
-- validate_CNN_track_matching_commented.ipynb: Takes the log outputs (from training and validating) to make plots vs. iteration (or epoch). Also writes and then reads output from given validation iteration weights, to look at event displays and statistics for the specified iteration.
