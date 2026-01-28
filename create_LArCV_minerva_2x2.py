@@ -479,7 +479,7 @@ if __name__ == "__main__":
     validation_output = directory+"larcv/larcv_validation_set/"
 
     # List all .root files in the specified directory
-    training_input_files = glob.glob(os.path.join(directory+"minerva/", "*.root"))
+    training_input_files = glob.glob(os.path.join(directory+"minerva/", "*.dst.root"))
     all_files = training_input_files
     #Shuffle to make random order
     shuffled_file_order = np.arange(0, len(all_files) )
@@ -496,6 +496,8 @@ if __name__ == "__main__":
     #Want to overwrite? Change to true, otherwise, will check and only write new files
     rewrite_output = False
     
+    n_entries =[]
+    n_matches = []
     for f_id in range(0,len(all_files)):
         base_name = os.path.basename(all_files[f_id])
         # extract the 7-digit number (or any sequence of digits)
@@ -556,6 +558,10 @@ if __name__ == "__main__":
             min_indices, mx2_unique_IDs = Mx2Hits.find_Mx2_uniqueID(minerva_index)
             spine_data = driver.process(spine_index)
             all_uniqueID_dict, all_2x2_vertexIDs, interaction_dict = find_2x2_uniqueIDs_remaining(spine_data, mx2_unique_IDs)
+
+            if (int(filenum) < 100) and training_bool:
+                n_clusters.append(len(all_uniqueID_dict))
+                n_matches.append((len(all_2x2_vertexIDs)+len(mx2_unique_IDs))-len(all_uniqueID_dict))
             #print("Spill", spill_id, all_uniqueID_dict)
             #print("Mx2 IDs", mx2_unique_IDs)
             #print("2x2 IDs", all_2x2_vertexIDs)
@@ -576,9 +582,10 @@ if __name__ == "__main__":
             run = 0 #Mx2Hits.mc_run
             subrun = 0 #Mx2Hits.mc_subrun
             my_larcv.set_id( run, subrun, spill_id )
-            my_larcv.save_entry()
+            #my_larcv.save_entry()
 
-        my_larcv.finalize()
+        print(n_clusters,n_matches)
+        #my_larcv.finalize()
         #write_and_close(my_larcv)
             
             
