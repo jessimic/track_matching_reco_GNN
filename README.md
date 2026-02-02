@@ -13,7 +13,7 @@ Matching tracks. Project started by Nathanial at https://github.com/ndsantia/mlr
 - GNN_training_testing_curves.ipynb: Takes the log outputs (from training and validating) to make plots vs. iteration (or epoch). Also writes output file for all the entries once you choose the best validation iteration.
 - Plotting_validation_Mx2.ipynh: Takes the hdf5 file written and looks at the overall confusion matrix along with single event plots showing "how correct" the network is per event.
 
-## Container
+## Container for SPINE Environment
 Use singularity or apptainer container to run SPINE and all above scripts, per their instructions (https://github.com/DeepLearnPhysics/spine). One is stored on the Harvard cluster at `/n/holystore01/LABS/iaifi_lab/Users/jmicallef/spine_larcv_ME_cuda_pytorch.sif`. For NERSC, you'll use shifter (see below). Example of how to pull your own singularity (if on a different cluster) at `jobs/pull_singularity.sh`.
 
 ### Run on NERSC, request a GPU node, run shifter to get the container
@@ -23,16 +23,66 @@ $ `salloc --nodes=1   --qos shared_interactive --ntasks=1  --time=01:00:00 --con
 
 $ `shifter --image=deeplearnphysics/larcv2:ub2204-cu121-torch251-larndsim`
 
-Instead of singularity or apptainer, NERSC uses "Shifter". More info at: https://docs.nersc.gov/services/jupyter/how-to-guides/#shifter. For NERSC, you can see more information about QOS limits and charges at https://docs.nersc.gov/jobs/policy/#qos-limits-and-charges. 
+Instead of singularity or apptainer, NERSC uses "Shifter". For NERSC, you can see more information about QOS limits and charges at https://docs.nersc.gov/jobs/policy/#qos-limits-and-charges. Now you are ready to run the spine repo!
 
-## Using Jupyter on NERSC
-Available at https://jupyter.nersc.gov/.
+### Setting up Environment for SPINE on Jupyter Notebooks with NERSC
+Available at https://jupyter.nersc.gov/. Set up the kernel on your jupyter to use the larcv image (only need to do once), using the info  https://docs.nersc.gov/services/jupyter/how-to-guides/#shifter. 
 
+Insider jupyter notebook, open a terminal and type this command:
+
+$ `shifter --image=deeplearnphysics/larcv2:ub2204-cu121-torch251-larndsim /usr/bin/python3 -m ipykernel install --prefix $HOME/.local --name env --display-name spine_larcv`
+
+You should now see this kernel.json with the configuration below:
+
+$ `jessiem@perlmutter:login16:~> cat /global/homes/j/$USER/.local/share/jupyter/kernels/env/kernel.json `
+```{
+ "argv": [
+  "/usr/bin/python3",
+  "-m",
+  "ipykernel_launcher",
+  "-f",
+  "{connection_file}"
+ ],
+ "display_name": "spine_larcv",
+ "language": "python",
+ "metadata": {
+  "debugger": true
+ }
+}
+```
+
+You will need to edit this (vim in terminal or open in jupyter) and add TWO LINES with the shifter and image again here:
+
+```{
+ "argv": [
+  "shifter",
+  "--image=deeplearnphysics/larcv2:ub2204-cu121-torch251-larndsim",
+  "/usr/bin/python3",
+  "-m",
+  "ipykernel_launcher",
+  "-f",
+  "{connection_file}"
+ ],
+ "display_name": "spine_larcv",
+ "language": "python",
+ "metadata": {
+  "debugger": true
+ }
+}
+```
+Note that this is following the directions in https://docs.nersc.gov/services/jupyter/how-to-guides/#shifter. Now you can choose a kernel called "spine_larcv" in the options when you run your jupyter notebook (top right of notebook). This will use the shifter image that you pointed to!
+
+## Getting SPINE
+Look at https://github.com/DeepLearnPhysics/spine for the latest. To make your own local copy:
+
+$ `git clone https://github.com/DeepLearnPhysics/spine.git`
+
+Whereever you set up spine, you will need to change the SOFTWARE_DIR paths in our notebooks to point to its src folder. This is done for running the gnn, both testing and inference and plotting. The initial jupyter notebooks only need the environment for the python setup (so you could in theory run that with a local python).
 
 ## Running GNN for Training and Inference
 --> Make sure your config file is set up inside the config folder and your `gnn.py` is pointing to it
 
-## Harvard Cluster Directions
+## OLD: Harvard Cluster Directions
 
 #### Run interactive job with GPU:
 $ `salloc --job-name=grappa_gnn  --nodes=1   --ntasks=1   --cpus-per-task=1   --mem=8G   --time=04:00:00   --gres=gpu:1`
