@@ -10,10 +10,10 @@ import random
 import re
 import os,sys
 import yaml
-sys.path.insert(0, '/sdf/data/neutrino/software/spine/src/')
-
-# Necessary imports
-from spine.driver import Driver
+from spine.io.core.read.hdf5 import HDF5Reader
+from spine.post.truth.match import MatchProcessor
+from spine.utils.match import overlap_iou
+#from spine.driver import Driver
 #This is code that takes all the MINERvA root files in a directory and creates a LARCV files that can be input into GrapPA
 
 
@@ -212,7 +212,7 @@ class Mx2Data:
                 fragment_id=fragment_counter
                 group_id= all_uniqueID_dict[str(fullid)] 
                 fragment_counter += 1
-                #print("Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
+                print("MINERVA Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
                 
                 #Create particle larcv object. Each cluster will need its own particle object, even if the clusters belong to one particle.
                 #Since this code only consider MINERvA tracks, every particle is assigned a track shape
@@ -248,56 +248,163 @@ class Mx2Data:
     #def write_and_close(self):
     #    self.out_larcv.finalize()
 
+def compute_iou_matrix(reco_clusters, truth_particles, get_index_fn):
+    """
+    Compute IoU overlap matrix between reco index clusters and truth particles. From Claude after reading spine matching.
+
+    Parameters
+    ----------
+    reco_clusters : List[np.ndarray]
+        List of index arrays for reco objects (your raw clusters)
+    truth_particles : List[object]
+        List of full truth particle objects
+    get_index_fn : callable
+        The processor's self.get_index method to extract indexes from truth objects
+    """
+    # Build truth index list using the existing get_index method
+    reco_input = [] #typed.List.empty_list(nb.int64[:])
+    for cluster in reco_clusters:
+        reco_input.append(cluster.astype(np.int64))
+
+    truth_input = [] #typed.List.empty_list(nb.int64[:])
+    for p in truth_particles:
+        truth_input.append(get_index_fn(p))
+
+    # Compute IoU matrix (N_reco x N_truth)
+    if len(reco_input) and len(truth_input):
+        ovl_matrix = overlap_iou(reco_input, truth_input)
+    else:
+        ovl_matrix = np.empty((len(reco_input), len(truth_input)))
+
+    return ovl_matrix
+
+def match_reco_clusters_to_truth(reco_clusters, particle_shapes, truth_particles, get_index_fn,
+                                  min_overlap=0.0):
+    """
+    Match reco index clusters to truth particles using IoU. From Claude after reading spine matching.
+
+    Parameters
+    ----------
+    reco_clusters : List[np.ndarray]
+        List of raw index arrays for reco objects
+    particle_shapes : List or np.ndarray
+        Shape label for each reco cluster, same length as reco_clusters
+    truth_particles : List[object]
+        List of full truth particle objects
+    get_index_fn : callable
+        The processor's self.get_index method
+    min_overlap : float
+        Minimum IoU threshold to consider a valid match
+
+    Returns
+    -------
+    pairs : List[tuple]
+        (reco_cluster, truth_particle or None) for each reco cluster
+    overlaps : List[float]
+        Best overlap score per reco cluster (-1.0 if unmatched)
+    """
+    assert len(reco_clusters) == len(particle_shapes), "reco_clusters (len" + len(reco_clusters) + " ) and particle_shapes len(" + len(particle_shapes) + ") must have the same length."
+    
+    ovl_matrix = compute_iou_matrix(reco_clusters, truth_particles, get_index_fn)
+    ovl_valid = ovl_matrix > min_overlap
+
+    pairs, pair_overlaps = [], []
+    for i, (cluster, shape) in enumerate(zip(reco_clusters, particle_shapes)):
+        match_idxs = np.where(ovl_valid[i])[0]
+
+        if not len(match_idxs):
+            pairs.append((cluster, None))
+            pair_overlaps.append(-1.0)
+        else:
+            overlaps = ovl_matrix[i, match_idxs]
+            perm = np.argsort(overlaps)[::-1]
+            sorted_idxs = match_idxs[perm]
+
+            best_truth = truth_particles[sorted_idxs[0]]
+            pairs.append((cluster, shape, best_truth))
+            pair_overlaps.append(overlaps[perm[0]])
+
+    return pairs, pair_overlaps
+    
+def get_pair_data(i, pairs, spine_data):
+    
+    
+
+    pair_here = pairs[i]
+
+    reco_cluster = pair_here[0]
+    reco_shape = pair_here[1]
+    mask = reco_cluster
+    points_particle = spine_data['points'][mask]
+    shape = int(reco_shape) if reco_shape is not None else -1
+
+    tp = None
+    if len(pair_here) > 2:
+        tp = pair_here[2]
+        
+    return shape, mask, points_particle, tp
+
 def process_one_2x2_entry(spine_data, entry,out_larcv, all_uniqueID_dict, vsa, vox3dmeta, fragment_counter, size_threshold=5):
     
     #print("Processing ND entry", entry)
     
-    truth_particles = spine_data['truth_particles'] #all true particles in a spill
+    no_truth_match = 1
     
     #print("")
     #print("Particles:")
     dontuse, dontuse2, int_dict = find_2x2_uniqueIDs_remaining(spine_data) #get the interaction ID to vertex ID conversion
     #print("2x2 interaction ID dict", int_dict)
-    for p in truth_particles:
-        fullid = str(p.pdg_code)+str(int_dict[p.interaction_id])+str(p.track_id)
-        
-        #Create threshold
-        if len(p.points[:,0]) < size_threshold:
-            #print("2x2 Particle under size threshold %i in event %i, skipping"%(size_threshold,entry))
-            continue
+    for cluster in range(len(pairs)):
+        shape, mask, points_particle, tp = get_pair_data(cluster, pairs, spine_data)
+        if shape == 1: #SAVE TRACK ONLY!
 
-        fragment_id=fragment_counter
-        group_id= all_uniqueID_dict[str(fullid)] 
-        fragment_counter += 1
-        #print("Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
-        
-        #Create particle larcv object
-        particle = larcv.Particle(larcv.ShapeType_t.kShapeTrack)
-        particle.id(int(fragment_id))
-        particle.group_id(int(group_id))
+            fragment_id=fragment_counter #Start from MINERvA fragments
+            fragment_counter += 1
 
-        #A voxel set corresponds to all the voxels for one cluster 
-        # fill voxelset 
-        track_as_voxelset = larcv.VoxelSet()
-        track_as_voxelset.id(int(fragment_id))
+            if tp is not None: #Check if it was matched with a truth particle
+                fullid = str(tp.pdg_code)+str(int_dict[tp.interaction_id])+str(tp.track_id) 
+            else:
+                #No uniqueID since that is calculated base on truth
+                #Create unique ID
+                fullid = "0" + str(no_truth_match) + "0"
+            group_id= all_uniqueID_dict[str(fullid)] 
+        
+
+            #Create threshold
+            #if len(p.points[:,0]) < size_threshold:
+                #print("2x2 Particle under size threshold %i in event %i, skipping"%(size_threshold,entry))
+            #    continue
 
         
-        for vox in range(len(p.points[:, 0])):
-            voxelid = vox3dmeta.id( p.points[vox, 0]*10, p.points[vox, 1]*10, p.points[vox, 2]*10 )
-            voxel = larcv.Voxel( voxelid )
-            if voxelid!=larcv.kINVALID_VOXELID: #Skip if invalid
-                track_as_voxelset.add( voxel )
+            print("SPINE Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
+            
+            #Create particle larcv object
+            particle = larcv.Particle(larcv.ShapeType_t.kShapeTrack)
+            particle.id(int(fragment_id))
+            particle.group_id(int(group_id))
 
-        # add voxelset to container
-        vsa.insert( track_as_voxelset )
+            #A voxel set corresponds to all the voxels for one cluster 
+            # fill voxelset 
+            track_as_voxelset = larcv.VoxelSet()
+            track_as_voxelset.id(int(fragment_id))
 
-        # get the cluster3d entry container, by contributing VoxelSetArray and the Voxel3Dmeta
-        entry_clust3d = out_larcv.get_data( "cluster3d", "pcluster" )
-        entry_clust3d.set( vsa, vox3dmeta )
-        
-        #get particle container and fill
-        entry_particles = out_larcv.get_data( "particle", "corrected")
-        entry_particles.append(particle)
+            
+            for vox in range(len(points_particle[:, 0])):
+                voxelid = vox3dmeta.id( points_particle[vox, 0]*10, points_particle[vox, 1]*10, points_particle[vox, 2]*10 )
+                voxel = larcv.Voxel( voxelid )
+                if voxelid!=larcv.kINVALID_VOXELID: #Skip if invalid
+                    track_as_voxelset.add( voxel )
+
+            # add voxelset to container
+            vsa.insert( track_as_voxelset )
+
+            # get the cluster3d entry container, by contributing VoxelSetArray and the Voxel3Dmeta
+            entry_clust3d = out_larcv.get_data( "cluster3d", "pcluster" )
+            entry_clust3d.set( vsa, vox3dmeta )
+            
+            #get particle container and fill
+            entry_particles = out_larcv.get_data( "particle", "corrected")
+            entry_particles.append(particle)
 
     return out_larcv
 
@@ -319,7 +426,7 @@ def process_entry(out_larcv, run, subrun, entry):
 def write_and_close(out_larcv):
     out_larcv.finalize()
     
-def find_2x2_uniqueIDs_remaining(spine_data, uniqueID_dict = None,size_threshold=5):
+def find_2x2_uniqueIDs_remaining(spine_data, uniqueID_dict = None,size_threshold=0):
     ## Takes in a dictionary that has other "int ID" to cross reference with 
     ## pdg+interaction+trackid "unique ID" per track. Use to combine Mx2 and
     ## 2x2 tracks. Or keep key_dict empty to make a new dict, the keys are
@@ -330,24 +437,34 @@ def find_2x2_uniqueIDs_remaining(spine_data, uniqueID_dict = None,size_threshold
     pdgs =[]
     trackids = []
     allids = []
-    truth_particles = spine_data[f'truth_particles']
-    truth_interactions = spine_data[f'truth_interactions']
+    reco_clusters = spine_data["particle_clusts"]
+    truth_particles = spine_data['truth_particles']
+    truth_interactions = spine_data['truth_interactions']
+    fake_interaction = 1
     
     interaction_dict = {}
     for ixn in truth_interactions:
         idkey = ixn.id
         vertex_id = ixn.interaction_id
         interaction_dict[idkey] = vertex_id
-        
-    for p in truth_particles:
+    
+    for cluster in range(len(reco_clusters)):    
+        shape, mask, points_particle, tp = get_pair_data(cluster, pairs, spine_data)
         #Create threshold
-        if len(p.points[:,0]) < size_threshold:
-            continue
-        #particle.interaction_id tells you int from 0 that corresponds to the vertex ID list in interaction.interaction_id
-        vertex_ids.append(interaction_dict[p.interaction_id]) 
-        pdgs.append(p.pdg_code)
-        trackids.append(p.track_id)
-        allids.append(str(p.pdg_code)+str(interaction_dict[p.interaction_id])+str(p.track_id))
+        if tp is not None:
+            if len(tp.points[:,0]) < size_threshold:
+                continue
+            #particle.interaction_id tells you int from 0 that corresponds to the vertex ID list in interaction.interaction_id
+            vertex_ids.append(interaction_dict[tp.interaction_id])
+            pdgs.append(tp.pdg_code)
+            trackids.append(tp.track_id)
+            allids.append(str(tp.pdg_code)+str(interaction_dict[tp.interaction_id])+str(tp.track_id))
+        else:
+            vertex_ids.append(fake_interaction) 
+            pdgs.append(0)
+            trackids.append(0)
+            allids.append("0"+str(fake_interaction)+"0")
+            fake_interaction+=1
     
     all_2x2_vertexIDs = set(vertex_ids) #just vertex ID
     unique_ids = set(allids) #includes pdg and track ID
@@ -377,7 +494,7 @@ def find_2x2_uniqueIDs_remaining(spine_data, uniqueID_dict = None,size_threshold
     
 def find_2x2_vertices(spine_data):
     
-    truth_interactions = spine_data[f'truth_interactions']
+    truth_interactions = spine_data['truth_interactions']
     vertex_ids = []
     for ixn in truth_interactions:
         vertex_ids.append(ixn.interaction_id)
@@ -411,10 +528,10 @@ def fill_in_nonshared_events(n_array, m_array):
 
     return filled_n_indices, filled_m_indices
 
-def find_vertex_ids_all_events(spine_driver,Mx2Hits):
+def find_vertex_ids_all_events(spine_reader,Mx2Hits):
     minerva_indices_save = []
     nd_indices_save = []
-    total_events_spine = len(spine_driver)
+    total_events_spine = len(spine_reader)
     total_events_mx2 = len(Mx2Hits.n_tracks)
     assert total_events_spine < total_events_mx2 #spine should be more "pruned" than minerva file
 
@@ -424,7 +541,7 @@ def find_vertex_ids_all_events(spine_driver,Mx2Hits):
         min_indices, mx2_unique_IDs = Mx2Hits.find_Mx2_uniqueID(i)
         minerva_indices_save.append(min_indices)
 
-        spine_data = spine_driver.process(i)
+        spine_data = spine_reader[i]
         nd_indices = find_2x2_vertices(spine_data)
         nd_indices_save.append(nd_indices)
     for i in range(total_events_spine,total_events_mx2):
@@ -473,7 +590,7 @@ def make_larcv_box(xmin = (-1080.0),ymin = (-1450.0), zmin = (-2400.0),xmax = (1
     return vsa, vox3dmeta
 
 if __name__ == "__main__":
-    directory = "/sdf/home/j/jessicam/Mx2/data/"
+    directory = "/global/homes/j/jessiem/track_matching_reco_GNN/mcfiles/"
 
     training_output = directory+"larcv/"
     validation_output = directory+"larcv/larcv_validation_set/"
@@ -487,17 +604,21 @@ if __name__ == "__main__":
 
     #Set up validation saving throughout processing
     #num_training = int(0.8 * len(all_files))
-    train_ratio = 0.8
-    val_every = round(1 / (1 - train_ratio))  # every Nth file for validation
+    train_ratio = 1.0 #0.8
+    if train_ratio < 1:
+        val_every = round(1 / (1 - train_ratio))  # every Nth file for validation
+    else:
+        val_every = 1000000
     
     #all_files = all_files[:1] 
     print(training_input_files, len(all_files))
 
     #Want to overwrite? Change to true, otherwise, will check and only write new files
-    rewrite_output = False
+    rewrite_output = True
     
     n_entries =[]
     n_matches = []
+    n_clusters = []
     for f_id in range(0,len(all_files)):
         base_name = os.path.basename(all_files[f_id])
         # extract the 7-digit number (or any sequence of digits)
@@ -505,7 +626,7 @@ if __name__ == "__main__":
         if match:
             filenum = match.group(1)
             #print(filenum)  # 0000101
-        spine_file = "/sdf/data/neutrino/sindhuk/MR6.4/v2/MiniRun6.4_1E19_RHC.spine_v2."+filenum+".MLRECO_SPINE.hdf5"
+        spine_file = directory + "spine_reco/MiniRun6.5_1E19_RHC.flow2supera."+filenum+".LARCV_MiniRun6.5_1E19_RHC.flow2supera.0-199.LARCV_partialSPINE_withtruth.h5"
         if not os.path.isfile(spine_file) or not os.path.isfile(all_files[f_id]):
             print("Missing matching spine or minerva file, check!!!!! skipping", spine_file, all_files[f_id])
             continue
@@ -530,24 +651,9 @@ if __name__ == "__main__":
                 continue
 
         print(base_name, os.path.basename(spine_file), output_file)
-        cfg = f'''
-        base:
-          verbosity: warning
-        build:
-          mode: both
-          fragments: false
-          particles: true
-          interactions: true
-          units: cm
-        io:
-          reader:
-            file_keys: {spine_file}
-            skip_unknown_attrs: True
-            name: hdf5
-        '''
-        driver = Driver(yaml.safe_load(cfg))
+        reader = HDF5Reader(spine_file)
         Mx2Hits = Mx2Data(all_files[f_id]) #, output_file)
-        spine_eventID, minerva_eventID = find_vertex_ids_all_events(driver,Mx2Hits)
+        spine_eventID, minerva_eventID = find_vertex_ids_all_events(reader,Mx2Hits)
         my_larcv = setup_larcv(output_file)
         #print(spine_eventID, minerva_eventID)
         for spill_id in range(0,len(spine_eventID)):
@@ -556,18 +662,26 @@ if __name__ == "__main__":
 
             #Find overlapping track IDs, using vertex ID + trackID (+ pdg for completeness)
             min_indices, mx2_unique_IDs = Mx2Hits.find_Mx2_uniqueID(minerva_index)
-            spine_data = driver.process(spine_index)
+            spine_data = reader[spine_index]
+            
+            #Match Processor
+            processor = MatchProcessor(particle=True)
+            pairs, overlaps = match_reco_clusters_to_truth(
+            reco_clusters=spine_data["particle_clusts"],
+            truth_particles=spine_data['truth_particles'],
+            particle_shapes=spine_data["particle_shapes"],
+            get_index_fn=processor.get_index,   # borrow from your existing processor
+            min_overlap=0.1
+            )
             all_uniqueID_dict, all_2x2_vertexIDs, interaction_dict = find_2x2_uniqueIDs_remaining(spine_data, mx2_unique_IDs)
-
-            if (int(filenum) < 100) and training_bool:
+            if (int(filenum) < 100): # and training_bool:
                 n_clusters.append(len(all_uniqueID_dict))
                 n_matches.append((len(all_2x2_vertexIDs)+len(mx2_unique_IDs))-len(all_uniqueID_dict))
-            #print("Spill", spill_id, all_uniqueID_dict)
+            print("Spill", spill_id, all_uniqueID_dict)
             #print("Mx2 IDs", mx2_unique_IDs)
             #print("2x2 IDs", all_2x2_vertexIDs)
 
 
- 
             #group id is the true particle id, so up and down stream track pieces created by the same particle should have the same group id
             #fragment id is the cluster id, so up and down stream track pieces will have a different fragment id even if created by the same particle
             group_ids = []
