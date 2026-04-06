@@ -212,7 +212,7 @@ class Mx2Data:
                 fragment_id=fragment_counter
                 group_id= all_uniqueID_dict[str(fullid)] 
                 fragment_counter += 1
-                print("MINERVA Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
+                #print("MINERVA Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
                 
                 #Create particle larcv object. Each cluster will need its own particle object, even if the clusters belong to one particle.
                 #Since this code only consider MINERvA tracks, every particle is assigned a track shape
@@ -376,7 +376,7 @@ def process_one_2x2_entry(spine_data, entry,out_larcv, all_uniqueID_dict, vsa, v
             #    continue
 
         
-            print("SPINE Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
+            #print("SPINE Fragment: ", fragment_id, "Group: ", group_id, "Unique ID", str(fullid))
             
             #Create particle larcv object
             particle = larcv.Particle(larcv.ShapeType_t.kShapeTrack)
@@ -596,7 +596,8 @@ if __name__ == "__main__":
     validation_output = directory+"larcv/larcv_validation_set/"
 
     # List all .root files in the specified directory
-    training_input_files = glob.glob(os.path.join(directory+"minerva/", "*.dst.root"))
+    #training_input_files = glob.glob(os.path.join(directory+"minerva/", "*.dst.root"))
+    training_input_files = glob.glob(os.path.join("/global/cfs/cdirs/dune/www/data/2x2/simulation/productions/MiniRun5_1E19_RHC/MiniRun5_1E19_RHC.minerva/DST/0000000/", "MiniRun5_1E19_RHC.minerva.0000[0,1]??.dst.root"))
     all_files = training_input_files
     #Shuffle to make random order
     shuffled_file_order = np.arange(0, len(all_files) )
@@ -604,17 +605,18 @@ if __name__ == "__main__":
 
     #Set up validation saving throughout processing
     #num_training = int(0.8 * len(all_files))
-    train_ratio = 1.0 #0.8
+    train_ratio = 0.8
     if train_ratio < 1:
         val_every = round(1 / (1 - train_ratio))  # every Nth file for validation
     else:
         val_every = 1000000
     
     #all_files = all_files[:1] 
-    print(training_input_files, len(all_files))
+    print("First two paths", training_input_files[:2])
+    print("total Number of files", len(all_files))
 
     #Want to overwrite? Change to true, otherwise, will check and only write new files
-    rewrite_output = True
+    rewrite_output = False
     
     n_entries =[]
     n_matches = []
@@ -629,6 +631,9 @@ if __name__ == "__main__":
         spine_file = directory + "spine_reco/MiniRun6.5_1E19_RHC.flow2supera."+filenum+".LARCV_MiniRun6.5_1E19_RHC.flow2supera.0-199.LARCV_partialSPINE_withtruth.h5"
         if not os.path.isfile(spine_file) or not os.path.isfile(all_files[f_id]):
             print("Missing matching spine or minerva file, check!!!!! skipping", spine_file, all_files[f_id])
+            continue
+        if str(filenum) == "0000057" or str(filenum) == "0000139" or str(filenum) == "0000172" or str(filenum) == "0000156" or str(filenum) == "0000070":
+            print("Skipping file 57")
             continue
         
         training_exists = False
@@ -677,7 +682,7 @@ if __name__ == "__main__":
             if (int(filenum) < 100): # and training_bool:
                 n_clusters.append(len(all_uniqueID_dict))
                 n_matches.append((len(all_2x2_vertexIDs)+len(mx2_unique_IDs))-len(all_uniqueID_dict))
-            print("Spill", spill_id, all_uniqueID_dict)
+            #print("Spill", spill_id, all_uniqueID_dict)
             #print("Mx2 IDs", mx2_unique_IDs)
             #print("2x2 IDs", all_2x2_vertexIDs)
 
@@ -696,11 +701,11 @@ if __name__ == "__main__":
             run = 0 #Mx2Hits.mc_run
             subrun = 0 #Mx2Hits.mc_subrun
             my_larcv.set_id( run, subrun, spill_id )
-            #my_larcv.save_entry()
+            my_larcv.save_entry()
 
         print(n_clusters,n_matches)
         #my_larcv.finalize()
-        #write_and_close(my_larcv)
+        write_and_close(my_larcv)
             
             
 
