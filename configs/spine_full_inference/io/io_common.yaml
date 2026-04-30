@@ -9,7 +9,7 @@ io:
     collate_fn: all
     dataset:
       name: larcv
-      file_keys: /global/cfs/cdirs/dune/www/data/2x2/simulation/productions/MiniRun6.5_1E19_RHC/MiniRun6.5_1E19_RHC.flow2supera/LARCV/0000000/MiniRun6.5_1E19_RHC.flow2supera.0000087.LARCV.root
+      file_keys: /global/cfs/cdirs/dune/www/data/2x2/simulation/productions/MiniRun6.5_1E19_RHC/MiniRun6.5_1E19_RHC.flow2supera/LARCV/0000000/MiniRun6.5_1E19_RHC.flow2supera.0000[0,1]??.LARCV.root
       schema:
         data:
           parser: sparse3d
@@ -62,7 +62,7 @@ io:
 
   writer:
     name: hdf5
-    file_name: MiniRun6.5_1E19_RHC.flow2supera.0000087.LARCV_partialSPINE_withtruth.root
+    file_name: MiniRun6.5_1E19_RHC.flow2supera.0-199.LARCV_partialSPINE_withtruth.root
     overwrite: false
     keys:
       - run_info
