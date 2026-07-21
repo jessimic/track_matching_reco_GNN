@@ -1,4 +1,4 @@
-# Base common configuration for ND-LAr (includes geometry and builder)
+# Base common configuration for 2x2 (includes geometry and builder)
 
 # Base configuration
 base:
@@ -15,7 +15,7 @@ base:
 
 # Geometry configuration
 geo:
-  detector: nd-lar
+  detector: 2x2
   # tag varies by config - override in specific configs
 
 # Build output representations
