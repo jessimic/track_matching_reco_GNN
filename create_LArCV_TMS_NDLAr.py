@@ -440,9 +440,9 @@ def make_larcv_box(
 
 
 if __name__ == "__main__":
-    directory  = "/global/homes/j/jessiem/track_matching_reco_GNN/"
-    TMS_DIR    = "/global/cfs/cdirs/dunepro/people/abooth/nd-production/output/MiniProdN5/run-tms-reco/MiniProdN5p1_NDComplex_FHC.tmsreco.full.sanddrift/TMSRECO/0002000/"
-    NDLAr_DIR  = "/global/cfs/cdirs/dunepro/people/abooth/nd-production/output/MiniProdN5/run-mlreco/MiniProdN5p1_NDComplex_FHC.spine.full.sanddrift/MLRECO_SPINE/0002000/"
+    directory  = "./" #/sdf/home/j/jessicam/Mx2/track_matching_reco_GNN/"
+    TMS_DIR    = directory + "MiniProdN5p1_NDComplex_FHC.tmsreco."
+    NDLAr_DIR  = directory + "MiniProd5p1"
     output_dir = directory + "mcfiles/larcv_ndlar/"
     output_base = "out_MiniProdN5p1_NDComplex_FHC"
     SPILLS_PER_FILE      = 1
@@ -481,10 +481,11 @@ if __name__ == "__main__":
             continue
         filenum = m.group(1)
 
-        spine_file = os.path.join(
-            NDLAr_DIR,
-            f"MiniProdN5p1_NDComplex_FHC.spine.full.sanddrift.{filenum}.MLRECO_SPINE.hdf5"
-        )
+        #spine_file = os.path.join(
+        #    NDLAr_DIR,
+        #    f"MiniProdN5p1_NDComplex_FHC.spine.full.sanddrift.{filenum}.MLRECO_SPINE.hdf5"
+        #)
+        spine_file="MiniProdN5p1_NDComplex_FHC.spine.full.sanddrift.0002471.MLRECO_SPINE.hdf5"
         if not os.path.isfile(spine_file):
             print(f"No matching SPINE file for {base_name}, skipping")
             continue
