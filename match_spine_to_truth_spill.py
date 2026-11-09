@@ -8,6 +8,9 @@ Method 1 (IDs): SPINE's interaction orig_id is NOT the Truth_Spill vertex ID.
   interactions are in the same order as the Truth_Spill vertices (ascending ID)
   to resolve ambiguities (order-preserving alignment).
 Method 2 (position): match vertex x, y, z.
+Method 3 (particles/tracks): within each position-matched vertex, match
+  Truth_Spill particles to SPINE particles by track ID (confirmed by PDG and
+  birth position), and link TMS reco tracks to them via Truth_Info.
 
 Run inside the spine-nb docker container (needs spine + uproot).
 """
@@ -196,3 +199,87 @@ for ev, (entry, assign) in id_matches.items():
         total += 1
         agree += any(key == (entry, tms_gid_pos[(entry, gid)]) for key, _ in pm)
 print(f"\nID matches that agree with position matches: {agree}/{total}")
+
+
+# ---------------------------------------------------------------------------
+# Method 3: particle and track matching within each position-matched vertex
+# ---------------------------------------------------------------------------
+# Within a correctly matched vertex, Truth_Spill TrackId == SPINE track_id
+# identifies the same Geant4 particle; PDG and birth position (< PARTICLE_TOL_MM)
+# are checked as confirmation. Truth_Spill particles with no SPINE counterpart
+# are mostly neutrals (n, pi0, gamma, nu) that leave no charge in ND-LAr.
+# TMS reco tracks (Truth_Info) point at their true particle through
+# RecoTrackPrimaryParticleIndex, an index into that spill's Truth_Spill
+# particle arrays, which links them to the SPINE particle.
+PARTICLE_TOL_MM = 1.0
+
+tms_part = tree.arrays(["BirthPosition", "DeathPosition", "IsPrimary"], library="np")
+tms_reco = uproot.open(tms_file)["Truth_Info"].arrays(
+    ["SpillNo", "RecoTrackN", "RecoTrackPrimaryParticleIndex"], library="np")
+spill_to_entry = {int(s): e for e, s in enumerate(tms["SpillNo"])}
+
+# (entry, Truth_Spill particle index) -> list of (Truth_Info entry, reco track index)
+reco_tracks_by_particle = {}
+for i, (spill_no, n_trk) in enumerate(zip(tms_reco["SpillNo"], tms_reco["RecoTrackN"])):
+    entry = spill_to_entry[int(spill_no)]
+    for k in range(n_trk):
+        p_idx = int(tms_reco["RecoTrackPrimaryParticleIndex"][i][k])
+        reco_tracks_by_particle.setdefault((entry, p_idx), []).append((i, k))
+
+
+def match_particles(entry, gid, ev, ixn_id, tol_mm=PARTICLE_TOL_MM):
+    """Match Truth_Spill particles of vertex gid to SPINE particles of interaction ixn_id.
+
+    Returns a list of dicts, one per Truth_Spill particle, with status:
+      'matched'  - same track ID, PDG and birth position within tol_mm
+      'rejected' - same track ID but PDG or birth position disagree
+      'tms_only' - no SPINE particle with this track ID (e.g. neutrals)
+    """
+    spine_parts = {int(p.track_id): p for p in spine_events[ev]["truth_particles"]
+                   if p.interaction_id == ixn_id}
+    out = []
+    for idx in np.where(tms["VertexGlobalID"][entry] == gid)[0]:
+        trk, pdg = int(tms["TrackId"][entry][idx]), int(tms["PDG"][entry][idx])
+        birth = np.asarray(tms_part["BirthPosition"][entry][idx][:3], dtype=float)
+        rec = {"tms_particle_idx": int(idx), "track_id": trk, "tms_pdg": pdg,
+               "is_primary": bool(tms_part["IsPrimary"][entry][idx]),
+               "reco_tracks": reco_tracks_by_particle.get((entry, int(idx)), []),
+               "spine_particle_id": None, "spine_pdg": None, "birth_dist_mm": None}
+        p = spine_parts.get(trk)
+        if p is None:
+            rec["status"] = "tms_only"
+        else:
+            dist = float(np.linalg.norm(np.asarray(p.position) * 10.0 - birth))  # cm -> mm
+            rec.update(spine_particle_id=int(p.id), spine_pdg=int(p.pdg_code), birth_dist_mm=dist)
+            rec["status"] = "matched" if (int(p.pdg_code) == pdg and dist <= tol_mm) else "rejected"
+        out.append(rec)
+    return out
+
+
+print("\n=== Particle / track matching within matched vertices ===")
+particle_matches = {}  # (SPINE event, ixn id) -> list of particle records
+for (entry, k), (ev, ixn_id, _) in position_matches.items():
+    gid = int(tms["TrueVtxGlobalID"][entry][k])
+    particle_matches[(ev, ixn_id)] = match_particles(entry, gid, ev, ixn_id)
+
+records = [r for recs in particle_matches.values() for r in recs]
+n_status = {s: sum(r["status"] == s for r in records) for s in ("matched", "rejected", "tms_only")}
+print(f"Truth_Spill particles in matched vertices: {len(records)}  {n_status}")
+missing_pdgs, counts = np.unique([r["tms_pdg"] for r in records if r["status"] == "tms_only"],
+                                 return_counts=True)
+print("  tms_only PDGs:", dict(sorted(zip(missing_pdgs.tolist(), counts.tolist()), key=lambda x: -x[1])))
+
+n_reco = sum(len(r["reco_tracks"]) for r in records)
+n_reco_matched = sum(len(r["reco_tracks"]) for r in records if r["status"] == "matched")
+print(f"TMS reco tracks from matched vertices: {n_reco}, "
+      f"linked to a SPINE particle: {n_reco_matched}")
+
+if verbose_print:
+    for (ev, ixn_id), recs in sorted(particle_matches.items()):
+        linked = [r for r in recs if r["status"] == "matched" and r["reco_tracks"]]
+        if not linked:
+            continue
+        print(f"SPINE event {ev} ixn {ixn_id}:")
+        for r in linked:
+            print(f"    track {r['track_id']} PDG {r['tms_pdg']} -> SPINE particle {r['spine_particle_id']} "
+                  f"(birth dist {r['birth_dist_mm']:.3f} mm), TMS reco tracks {r['reco_tracks']}")
