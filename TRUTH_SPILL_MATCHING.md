@@ -139,15 +139,58 @@ particle/track matches. Its printed results match the script's on file `0000005`
   `reco_tracks`. `particles_both` keeps the 373 with hits in both detectors; `particles_reco`
   keeps the 228 with a TMS reco track.
 - **3D event display** — plotly `Scatter3d` with the TMS and ND-LAr volumes drawn as wireframe
-  boxes (geometry from `TMS_Constants.h`). Two entry points:
-  - `draw_vertices(rows)` takes `match_df` rows: all ND-LAr points of the interaction, all TMS
-    true hits of the vertex, and both vertex markers. Defaults to the first 3 rows of `both`.
-  - `draw_particles(rows)` takes `particle_df` rows: the SPINE particle's ND-LAr points, the TMS
-    true hits with its track ID, each linked TMS reco track (hits joined by a line), and the
-    vertex markers. Defaults to the first 3 rows of `particles_reco`.
+  boxes (geometry from `TMS_Constants.h`). Two entry points, described below:
+  `draw_vertices(rows)` and `draw_particles(rows, ...)`.
 
-The container has no `ipywidgets`, so rows are chosen by editing the list in the last cell of
-each plotting section rather than with a widget.
+### Setup
+
+The first cells set `SOFTWARE_DIR` (added to `sys.path` so `spine` can be imported from a local
+install) and `data_dir` (where the two input files live). Both need editing for each machine; in
+the `spine-nb` container `spine` is already importable and the files are under `/data`.
+
+### `draw_vertices(rows)`
+
+Takes `match_df` rows: all ND-LAr points of the SPINE interaction, all TMS true hits of the
+vertex, and both vertex markers.
+
+### `draw_particles(rows, ...)`
+
+Takes `particle_df` rows. For each chosen particle it draws the SPINE particle's ND-LAr points
+(strong colour), the TMS true hits with its track ID (light shade of the same colour), and each
+linked TMS reco track (hits joined by a line). The notebook's example selects every particle in
+`particles_reco` from one spill (spill 6: 28 particles, 24 from throughgoing vertices).
+
+```
+draw_particles(rows, show_vertex=True, show_legend=True, show_other_particles=False,
+               show_table=True, given_title=None, show_all_activity=False, toggles=True)
+```
+
+| Option | Effect |
+|---|---|
+| `show_vertex` | Vertex markers: SPINE vertex (red open square) and Truth_Spill vertex (black cross), once per vertex. |
+| `show_other_particles` | Everything else at the chosen particles' vertices: other *matched* particles in colour, drawn like the chosen ones; *unmatched* activity in gray, one trace per vertex for SPINE particles with no Truth_Spill match (dark gray `#7f7f7f`, ND-LAr) and one for TMS true hits not from a matched particle (light gray `#c7c7c7`, TMS). |
+| `show_all_activity` | Everything else in the same spill(s), in faint gray and smaller markers: every other SPINE interaction's ND-LAr points (`#b5b5b5`), every other Truth_Spill vertex's TMS true hits (`#dedede`), and every TMS reco track not already drawn (`#9e9e9e` lines). One trace per kind per spill. Implies `show_other_particles`. |
+| `toggles` | `True` (default): all three optional layers above are always built, and an independent **on/off button** for each is placed above the plot (plotly `updatemenus`; the first click flips the layer, the second flips it back). The three `show_*` options then only set what is visible at first. `False`: only the requested layers are built, with no buttons. |
+| `show_legend` | `False` removes the plot legend entirely, so the table is the reference. |
+| `show_table` | Displays a table under the plot with one row per legend entry: a colour swatch, colour, marker type, item (spill, interaction, track, PDG), what is shown, a count, the **layer** it belongs to, and whether it was **visible at start**. With toggles on it lists every layer, including hidden ones. |
+| `given_title` | Plot title (default: the list of `particle_df` rows). |
+
+**Colours.** The first 7 particles use the notebook's 7-colour palette; later ones use plotly's
+Dark24 (strong) / Light24 (light) sets, so colours repeat after 31 objects — the table's item
+column tells repeats apart. Grays are reserved for unmatched and background activity.
+
+**Things to know:**
+- With `toggles=True` the faint activity layer (about 100,000 ND-LAr points per spill) is
+  always built, even when hidden, so rendering is slower; use `toggles=False` if that matters.
+- The activity layer leaves out what the "other particles" layer draws. Turning "other
+  particles" off while "all other activity" is on hides those particles in both.
+- ND-LAr charge that isn't assigned to any SPINE true interaction is not drawn by any layer.
+- `draw_particles` was tested in the container by building the figures (trace counts, initial
+  visibility, and which traces each button controls); the buttons have not been clicked in a
+  rendered plot as part of that test.
+
+The container has no `ipywidgets`, so rows are chosen by editing the list in the cell that calls
+each plotting function, and layer toggling uses plotly's own buttons rather than widgets.
 
 ## Testing
 
