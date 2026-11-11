@@ -1,8 +1,9 @@
 # Truth-Spill Event Matching: SPINE (ND-LAr) <-> TMS
 
 Documentation for work done in the "Truth Spill event matching" conversation, covering
-[match_spine_to_truth_spill.py](match_spine_to_truth_spill.py) and
-[SPINE_TMS_vertex_matching_viewer.ipynb](SPINE_TMS_vertex_matching_viewer.ipynb).
+[match_spine_to_truth_spill.py](match_spine_to_truth_spill.py),
+[SPINE_TMS_vertex_matching_viewer.ipynb](SPINE_TMS_vertex_matching_viewer.ipynb) and
+[create_LArCV_NDLAr_TMS_matched.py](create_LArCV_NDLAr_TMS_matched.py).
 
 ## Goal
 
@@ -192,6 +193,49 @@ column tells repeats apart. Grays are reserved for unmatched and background acti
 The container has no `ipywidgets`, so rows are chosen by editing the list in the cell that calls
 each plotting function, and layer toggling uses plotly's own buttons rather than widgets.
 
+## create_LArCV_NDLAr_TMS_matched.py
+
+Writes ND-LAr + TMS LArCV files for GrapPA training, using the Method 2 + Method 3 matches as the
+cross-detector truth. Modelled on `create_LArCV_minerva_2x2.py` (the per-particle fragment
+pattern in its lines 269–300, and its file loop and train/validation split), with the 2x2 +
+MINERvA inputs replaced by SPINE + TMS. It is separate from the older
+`create_LArCV_TMS_NDLAr.py`, which matches by vertex time and PDG.
+
+**One LArCV entry per spill.** SPINE events are paired with Truth_Spill entries by majority vote
+of the Method 2 vertex matches (`pair_spills`), not by assuming equal indices.
+
+**Fragments** (each one LArCV `Particle` + `VoxelSet`, written to `cluster3d_pcluster` and
+`particle_corrected` as in the reference):
+- **ND-LAr:** one fragment per SPINE true particle, using its true points (cm → mm), with the
+  reference's 5-point size threshold. Shape is SPINE's true semantic shape (track, shower,
+  delta, Michel, ...); the reference marks everything as a track — to match it, change
+  `larcv.ShapeType_t(int(p.shape))` to `kShapeTrack`.
+- **TMS:** one fragment per TMS reco track, using its `Reco_Tree` hit positions
+  (`TrackHitPos[track][:nHits]`, mm), shape track.
+- `fragment_id` (`particle.id`, also the voxel set id) is a counter that restarts at 0 in each
+  spill. `pdg_code` and `track_id` are also set on each particle, for debugging (the reference
+  doesn't set them).
+
+**`group_id` is one per true particle.**
+- A TMS reco track gets the group of its true Truth_Spill particle (via
+  `RecoTrackPrimaryParticleIndex`), so two reco tracks from the same particle share a group.
+- An ND-LAr particle that Method 3 matched to that same Truth_Spill particle gets the same
+  group. These shared groups are the cross-detector matches GrapPA should learn.
+- Everything else gets its own group.
+
+**Box (`make_larcv_box`).** x −4000 to 4000, y −3705 to 1000, z 4000 to 19000 mm, 3 mm voxels
+(2667 × 1569 × 5000), covering both active volumes (limits in the code comments). This is the
+same box `Plotting_validation_TMS.ipynb` uses to convert voxels back to mm. The older
+`create_LArCV_TMS_NDLAr.py` uses 1.5 mm voxels and y from −3700, which cuts 2.2 mm off the bottom
+of TMS; the voxel size is a single argument (`voxel_size`).
+
+**Running it.** The `__main__` loop globs `directory` (default `./`) for `*.TMSRECO.root`,
+pairs each with the SPINE file of the same 7-digit number, puts every 5th file pair in
+`larcv/larcv_validation_set/` and the rest in `larcv/`, and skips existing outputs unless
+`rewrite_output = True`. Unlike the reference (where they are commented out), it calls
+`save_entry()` for every spill and `finalize()` at the end of each file. Needs `spine` and
+`larcv` (both available in the `spine-nb` container).
+
 ## Testing
 
 All results below are from file index `0000005` only (7 spills, `SpillNo` 0–6), run inside the
@@ -374,3 +418,41 @@ equals `RecoTrackPrimaryParticleVtxGlobalID` and whose `PDG` equals
 **Unlinked reco tracks.** The 27 reco tracks (of 255) without a SPINE link all belong to
 `tms_only` particles: by true PDG, 9 photons, 2 K⁰L, 1 neutron, 1 antineutron, 6 μ⁻, 1 μ⁺, 4 π⁺, 1 π⁻,
 2 protons. The neutral ones are expected; where the charged ones come from was not checked.
+
+### LArCV writer — `create_LArCV_NDLAr_TMS_matched.py`
+
+Run on file `0000005` in the `spine-nb` container by calling the script's functions directly
+(`pair_spills`, `match_particles`, `make_larcv_box`, `process_one_spill`) and writing to a
+temporary file, then reading the file back with a larcv `IOManager`. The `__main__` loop itself
+was not run, to avoid sweeping every file in the data directory; it calls the same functions.
+
+| Spill | ND-LAr fragments (matched) | TMS fragments (sharing a group with ND-LAr) | Groups |
+|---|---|---|---|
+| 0 | 537 (140) | 80 (30) | 585 |
+| 1 | 774 (168) | 78 (37) | 812 |
+| 2 | 544 (116) | 75 (35) | 582 |
+| 3 | 844 (156) | 73 (32) | 883 |
+| 4 | 837 (142) | 84 (32) | 888 |
+| 5 | 694 (142) | 72 (34) | 732 |
+| 6 | 891 (160) | 63 (28) | 926 |
+
+Checks:
+- **Spill pairing:** every SPINE event paired with the Truth_Spill entry of the same index
+  (event N → entry N, from 93–113 matched vertices each).
+- **Read-back:** the file has 7 entries (one per spill), and in every entry:
+  - the number of voxel sets equals the number of particles,
+  - every `fragment_id` is unique,
+  - every voxel set's id equals its particle's `fragment_id`,
+  - no voxel set is empty (no point fell outside the box).
+- **Shared groups agree with Method 3:** across the 7 spills, 228 TMS reco tracks share a group
+  with an ND-LAr fragment — the same 228 reco tracks Method 3 links to a SPINE particle.
+- **Matched ND-LAr fragments are fewer than Method 3 particle matches** (e.g. spill 0: 140
+  written vs 149 matched) because matched particles with fewer than 5 points are dropped by the
+  size threshold.
+- **Groups with more than one fragment** (e.g. 32 in spill 0) are slightly more than the shared
+  ND-LAr/TMS groups (30), since a Truth_Spill particle can have more than one TMS reco track.
+- **Box meta read back as expected:** x −4000 to 4000, y −3705 to 1000, z 4000 to 19000 mm,
+  2667 × 1569 × 5000 voxels.
+- **Shapes** (spill 0, all 617 fragments): 307 track (227 ND-LAr + the 80 TMS reco tracks),
+  214 delta, 88 shower, 8 Michel — ND-LAr particles keep their SPINE shape; TMS reco tracks are
+  tracks.
