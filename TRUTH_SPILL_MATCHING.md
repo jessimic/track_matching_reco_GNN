@@ -15,7 +15,8 @@ MiniProd files are produced separately for the two detectors:
 
 Neither file cross-references the other directly, and the ID fields that look like they should
 line up don't: SPINE's interaction `orig_id` is **not** the Truth_Spill vertex `TrueVtxGlobalID`
-or `VertexGlobalID` (it's a run prefix + a running counter over SPINE's own interactions). The
+or `VertexGlobalID` (it's a run prefix + a running counter over the interactions edep-sim saved;
+edep-sim, not SPINE, does not save empty interactions). The
 scripts in this doc establish, and cross-check, a correspondence between:
 
 1. a SPINE true interaction (ND-LAr) and a Truth_Spill vertex (same physical neutrino
@@ -53,7 +54,8 @@ independent alignments:
   SPINE's `orig_id` (and `interaction_id`, which is identical: 700/700) is **not** a Truth_Spill
   vertex ID for either kind (0/196 normal and 0/504 throughgoing equal their position-matched
   `TrueVtxGlobalID`). For normal interactions it is the run prefix plus a running counter over
-  SPINE's own kept interactions, e.g. `50000000, 50000001, ...` for vertices
+  the interactions edep-sim saved (edep-sim, not SPINE, does not save empty interactions, so the
+  counter skips vertices), e.g. `50000000, 50000001, ...` for vertices
   `50000006, 50000023, ...`. Its values can collide with the *wrong* vertex — e.g. interaction 6
   has `orig_id 50000006`, which is the vertex ID of interaction 0. Throughgoing `orig_id`s are a
   different numbering again (e.g. `…52000013, …52000014, …52000033` for vertices
@@ -73,7 +75,7 @@ independent alignments:
 
 ### Method 2 — position-based matching (`match_by_position`)
 
-A fully independent, geometry-only match, and the **reference** method (Method 3 is built on
+A fully independent, geometry-only match, and the **reference** method (Method 2.5 is built on
 its matches): each Truth_Spill vertex (`TrueVtxX/Y/Z`, mm) is
 matched to its nearest SPINE true-interaction vertex (`ixn.vertex`, converted cm → mm), and kept
 only if the distance is within `VERTEX_TOL_MM` (1.0 mm). This method makes no use of particle
@@ -83,7 +85,7 @@ The script then cross-checks the two methods directly: for every ID-based match,
 whether the same (event, interaction) pair also has a position match to the same Truth_Spill
 vertex.
 
-### Method 3 — particle/track matching (`match_particles`)
+### Method 2.5 — particle/track matching (`match_particles`)
 
 Added after Methods 1 & 2 were validated. Within each *position-matched* vertex (from Method 2),
 individual particles are linked across detectors:
@@ -112,7 +114,7 @@ reco-track → SPINE-particle link.
 
 ## SPINE_TMS_vertex_matching_viewer.ipynb
 
-Interactive companion notebook: reruns Methods 1, 2 and 3 from the script with the same logic
+Interactive companion notebook: reruns Methods 1, 2 and 2.5 from the script with the same logic
 and the same numbering (Method 2, position, is the reference), then builds a vertex table, a
 particle table, and a 3D event display that plots either whole vertices or individual
 particle/track matches. Its printed results match the script's on file `0000005`.
@@ -129,7 +131,7 @@ particle/track matches. Its printed results match the script's on file `0000005`
   hits from its descendants.
 - **Method 1 / Method 2 / cross-check** — same logic as the script (both Method 1 streams), with
   the cross-check printed separately for normal and throughgoing interactions.
-- **Method 3** — same as the script; results in `particle_matches`.
+- **Method 2.5** — same as the script; results in `particle_matches`.
 - **Vertex table** (`match_df`) — one row per position-matched vertex: `throughgoing`,
   `id_method_agrees`, `n_particles_matched`, `n_reco_tracks_linked`, and hit counts in each
   detector (`n_NDLAr_points`, `n_TMS_hits`). `both` keeps the 391 vertices with hits in both
@@ -159,43 +161,73 @@ vertex, and both vertex markers.
 Takes `particle_df` rows. For each chosen particle it draws the SPINE particle's ND-LAr points
 (strong colour), the TMS true hits with its track ID (light shade of the same colour), and each
 linked TMS reco track (hits joined by a line). The notebook's example selects every particle in
-`particles_reco` from one spill (spill 6: 28 particles, 24 from throughgoing vertices).
+`particles_reco` from one spill (set by `spill_num`; e.g. spill 6 has 28 such particles, 24 from
+throughgoing vertices), and saves the plot to HTML.
 
 ```
 draw_particles(rows, show_vertex=True, show_legend=True, show_other_particles=False,
-               show_table=True, given_title=None, show_all_activity=False, toggles=True)
+               show_table=True, given_title=None, show_all_activity=False, toggles=True,
+               save_html=None, return_fig=False, tracks_only=False, throughgoing_only=False)
 ```
+
+**Layers** (each has an on/off button when `toggles=True`):
 
 | Option | Effect |
 |---|---|
 | `show_vertex` | Vertex markers: SPINE vertex (red open square) and Truth_Spill vertex (black cross), once per vertex. |
-| `show_other_particles` | Everything else at the chosen particles' vertices: other *matched* particles in colour, drawn like the chosen ones; *unmatched* activity in gray, one trace per vertex for SPINE particles with no Truth_Spill match (dark gray `#7f7f7f`, ND-LAr) and one for TMS true hits not from a matched particle (light gray `#c7c7c7`, TMS). |
-| `show_all_activity` | Everything else in the same spill(s), in faint gray and smaller markers: every other SPINE interaction's ND-LAr points (`#b5b5b5`), every other Truth_Spill vertex's TMS true hits (`#dedede`), and every TMS reco track not already drawn (`#9e9e9e` lines). One trace per kind per spill. Implies `show_other_particles`. |
-| `toggles` | `True` (default): all three optional layers above are always built, and an independent **on/off button** for each is placed above the plot (plotly `updatemenus`; the first click flips the layer, the second flips it back). The three `show_*` options then only set what is visible at first. `False`: only the requested layers are built, with no buttons. |
+| `show_other_particles` | Everything else at the chosen particles' vertices: other *matched* particles in colour, drawn like the chosen ones; *unmatched* activity in gray, per vertex: SPINE particles with no Truth_Spill match (dark gray `#7f7f7f`, ND-LAr) and TMS true hits not from a matched particle (light gray `#c7c7c7`, TMS), each split into track / non-track traces. |
+| `show_all_activity` | Everything else in the same spill(s), in faint gray and smaller markers: the particles of every other SPINE interaction (ND-LAr, `#b5b5b5`), every other Truth_Spill vertex's TMS true hits (`#dedede`), and every TMS reco track not already drawn (`#9e9e9e` lines). Split per spill into track / non-track × throughgoing / non-throughgoing traces. Implies `show_other_particles`. |
+
+**Filters** (each also has an on/off button when `toggles=True`); they act on every layer that is
+on, and **do not turn any layer on**:
+
+| Option | Effect |
+|---|---|
+| `tracks_only` | Only track-shaped particles. Track = SPINE shape `track` for ND-LAr particles; TMS reco tracks count as tracks (when drawn with a matched particle they follow that particle's shape); TMS true hits of TMS-only particles, which have no SPINE shape, count as track-like if their PDG is μ±, π±, K± or p/p̄ (`TRACK_LIKE_PDGS`, a PDG proxy). E.g. Tracks only + All other activity shows only the tracks in the activity layer. |
+| `throughgoing_only` | Only particles, and vertex markers, from throughgoing (1e15-flagged) vertices. Activity-layer reco tracks are throughgoing if their true particle's vertex is. |
+
+**Other options:**
+
+| Option | Effect |
+|---|---|
+| `toggles` | `True` (default): all three optional layers are always built, with a row of layer buttons and a second row of filter buttons above the plot (plotly `updatemenus`; the first click flips the setting, the second flips it back). A trace shows only if its layer is on and no active filter hides it. The `show_*` / `*_only` options then only set the starting state. `False`: only what starts visible is built, with no buttons. |
 | `show_legend` | `False` removes the plot legend entirely, so the table is the reference. |
-| `show_table` | Displays a table under the plot with one row per legend entry: a colour swatch, colour, marker type, item (spill, interaction, track, PDG), what is shown, a count, the **layer** it belongs to, and whether it was **visible at start**. With toggles on it lists every layer, including hidden ones. |
+| `show_table` | Displays a table under the plot with one row per legend entry: a colour swatch, colour, marker type, item (spill, interaction, track, PDG), what is shown, a count, the **layer** it belongs to, whether it counts as a **track** and as **throughgoing** (`–` = not filtered, e.g. detector boxes), and whether it was **visible at start** (layers and filters both accounted for). With toggles on it lists every layer, including hidden ones. |
 | `given_title` | Plot title (default: the list of `particle_df` rows). |
+| `save_html` | Path of an HTML file to also write the plot to, with the legend table below it. Self-contained (plotly.js embedded, ~3.5 MB), so it opens offline in any browser with all buttons working. Hidden layers are saved too, so with toggles on the file was about 8 MB in tests (measured before the filter buttons were added). `draw_vertices(rows, save_html=...)` saves its plot the same way, without a table. |
+| `return_fig` | Return the plotly figure for further changes; assign it (`fig = draw_particles(...)`) so Jupyter doesn't display it twice. Off by default. |
 
 **Colours.** The first 7 particles use the notebook's 7-colour palette; later ones use plotly's
 Dark24 (strong) / Light24 (light) sets, so colours repeat after 31 objects — the table's item
 column tells repeats apart. Grays are reserved for unmatched and background activity.
 
 **Things to know:**
+- **How the buttons combine.** Layer buttons switch traces' `visible` property; the filters hide
+  traces by making them transparent instead (Tracks only: trace opacity; Throughgoing only:
+  marker opacity and line width). Plotly buttons cannot see each other's state, so using
+  different properties is what lets all five combine. Side effect: filtered traces stay in the
+  plot legend and may still show hover labels.
+- **Trace count.** Splitting every layer by track and throughgoing makes the legend and table
+  longer, e.g. 233 traces for the spill-0 example with all activity on.
 - With `toggles=True` the faint activity layer (about 100,000 ND-LAr points per spill) is
   always built, even when hidden, so rendering is slower; use `toggles=False` if that matters.
 - The activity layer leaves out what the "other particles" layer draws. Turning "other
   particles" off while "all other activity" is on hides those particles in both.
-- ND-LAr charge that isn't assigned to any SPINE true interaction is not drawn by any layer.
-- `draw_particles` was tested in the container by building the figures (trace counts, initial
-  visibility, and which traces each button controls); the buttons have not been clicked in a
-  rendered plot as part of that test.
+- The activity layer's ND-LAr points come from each interaction's *particles* (so they can be
+  split by shape). ND-LAr charge not assigned to a SPINE true particle is not drawn by any layer.
+- **Testing.** `draw_particles` was tested in the container by building the figures and
+  simulating what each trace renders at the start. With Tracks only + All other activity, no
+  non-track trace renders; with `throughgoing_only=True, toggles=False`, every kept entry is
+  throughgoing (apart from the detector boxes); and each filter button controls exactly the
+  traces the table marks "no" for that filter. The buttons have not been clicked in a rendered
+  plot as part of that test.
 
 The container has no `ipywidgets`, so rows are chosen by editing the list in the cell that calls
 each plotting function, and layer toggling uses plotly's own buttons rather than widgets.
 
 ## create_LArCV_NDLAr_TMS_matched.py
 
-Writes ND-LAr + TMS LArCV files for GrapPA training, using the Method 2 + Method 3 matches as the
+Writes ND-LAr + TMS LArCV files for GrapPA training, using the Method 2 + Method 2.5 matches as the
 cross-detector truth. Modelled on `create_LArCV_minerva_2x2.py` (the per-particle fragment
 pattern in its lines 269–300, and its file loop and train/validation split), with the 2x2 +
 MINERvA inputs replaced by SPINE + TMS. It is separate from the older
@@ -219,7 +251,7 @@ of the Method 2 vertex matches (`pair_spills`), not by assuming equal indices.
 **`group_id` is one per true particle.**
 - A TMS reco track gets the group of its true Truth_Spill particle (via
   `RecoTrackPrimaryParticleIndex`), so two reco tracks from the same particle share a group.
-- An ND-LAr particle that Method 3 matched to that same Truth_Spill particle gets the same
+- An ND-LAr particle that Method 2.5 matched to that same Truth_Spill particle gets the same
   group. These shared groups are the cross-detector matches GrapPA should learn.
 - Everything else gets its own group.
 
@@ -283,7 +315,8 @@ Summary per Truth_Spill entry:
 Only ~22% of Truth_Spill vertices (700/3135) have a SPINE counterpart within 1 mm. This is
 **expected, not a matching failure**: Truth_Spill lists every neutrino vertex in the spill,
 wherever it happened — most are in the surrounding rock, hall, or TMS (the flagged external
-vertices are 92–96% of each entry). SPINE keeps only interactions that leave charge in ND-LAr. That
+vertices are 92–96% of each entry). On the ND-LAr side, edep-sim — not SPINE — does not save
+empty interactions, so only interactions that deposit energy in ND-LAr reach SPINE. That
 includes some external vertices whose particles enter ND-LAr — Method 2 matches these too, since
 it uses positions rather than IDs — but most vertices in the spill never put anything into
 ND-LAr and so have no SPINE interaction to match. In the matched rows inspected, the
@@ -329,7 +362,7 @@ problem (0 violations in 497 consecutive pairs). The signatures carry almost no 
 
 This limit comes from what the files contain, not from the score. **Use Method 2 as the
 reference** for all interactions; Method 1 is an independent cross-check that is reliable for
-normal interactions only. Method 3 builds on Method 2's matches, not Method 1's.
+normal interactions only. Method 2.5 builds on Method 2's matches, not Method 1's.
 
 ### Vertex time as an alternative to position (tested, not used)
 
@@ -370,7 +403,7 @@ matching would probably work in every spill (not tested). Other TMS time branche
 **Conclusion:** keep position (Method 2) as the reference. Time could serve as an extra check in
 spill 0 only.
 
-### Method 3 — particle/track matching
+### Method 2.5 — particle/track matching
 
 Run end-to-end on file `0000005` (all 7 spills) inside the `spine-nb` container:
 
@@ -390,7 +423,7 @@ TMS reco tracks from matched vertices: 255, linked to a SPINE particle: 228
 | TMS reco tracks from matched vertices | 255 |
 | Reco tracks linked to a SPINE particle | 228 |
 
-**Track IDs are reliable within a correctly matched vertex.** Before writing Method 3, a check on
+**Track IDs are reliable within a correctly matched vertex.** Before writing Method 2.5, a check on
 the first 3 spills found that every Truth_Spill particle whose track ID exists in the matched
 SPINE interaction (265/265) has the same PDG and a birth position within 1 mm. The full run
 agrees: 0 rejected out of 1,065 track-ID matches.
@@ -444,9 +477,9 @@ Checks:
   - every `fragment_id` is unique,
   - every voxel set's id equals its particle's `fragment_id`,
   - no voxel set is empty (no point fell outside the box).
-- **Shared groups agree with Method 3:** across the 7 spills, 228 TMS reco tracks share a group
-  with an ND-LAr fragment — the same 228 reco tracks Method 3 links to a SPINE particle.
-- **Matched ND-LAr fragments are fewer than Method 3 particle matches** (e.g. spill 0: 140
+- **Shared groups agree with Method 2.5:** across the 7 spills, 228 TMS reco tracks share a group
+  with an ND-LAr fragment — the same 228 reco tracks Method 2.5 links to a SPINE particle.
+- **Matched ND-LAr fragments are fewer than Method 2.5 particle matches** (e.g. spill 0: 140
   written vs 149 matched) because matched particles with fewer than 5 points are dropped by the
   size threshold.
 - **Groups with more than one fragment** (e.g. 32 in spill 0) are slightly more than the shared
