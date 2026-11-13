@@ -259,14 +259,14 @@ def pair_spills(driver, tms, verbose=False):
 
 
 if __name__ == "__main__":
-    directory = "./"
-    spine_dir = directory
-    tms_dir = directory
-    training_output = directory + "larcv/"
-    validation_output = directory + "larcv/larcv_validation_set/"
+    work_directory = "/global/homes/j/jessiem/track_matching_reco_GNN/data/"
+    spine_dir = "/global/cfs/cdirs/dunepro/people/abooth/nd-production/output/MiniProdN5/run-mlreco/MiniProdN5p3_NDComplex_FHC.spine.full.sanddrift/MLRECO_SPINE/0000000"
+    tms_dir = "/global/cfs/cdirs/dunepro/people/abooth/nd-production/output/MiniProdN5/run-tms-reco/MiniProdN5p3_NDComplex_FHC.tmsreco.full.sanddrift.v4/TMSRECO/0000000/"
+    training_output = work_directory + "larcv/"
+    validation_output = work_directory + "larcv/larcv_validation_set/"
     rewrite_output = False   # True: overwrite existing output files
     TRAIN_FRACTION = 0.8     # fraction of the usable file pairs written to training; the rest go to validation
-    N_FILES = None           # int: only use the first N_FILES *.TMSRECO.root files (sorted by name); None: all
+    N_FILES = 2           # int: only use the first N_FILES *.TMSRECO.root files (sorted by name); None: all
     VERBOSE = False
 
     os.makedirs(training_output, exist_ok=True)
@@ -351,9 +351,9 @@ if __name__ == "__main__":
         my_larcv.finalize()
         print(f"  wrote {len(pairs)} spill(s) to {output_file}")
 
+    print("TMS reco tracks (true particle matched to a non-track SPINE particle) and ND-LAr reco particles with no truth match")
     print("\nRemoved per spill:")
-    print("  file     spill  TMS reco tracks (true particle matched to a non-track SPINE particle)"
-          "  ND-LAr reco particles with no truth match")
+    print("  file     spill  TMS    ND-LAr")
     for filenum, spill_id, n_tms, n_nd in removed_per_spill:
         print(f"  {filenum}  {spill_id:5d}  {n_tms:69d}  {n_nd:41d}")
     if removed_per_spill:
