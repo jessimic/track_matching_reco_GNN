@@ -266,7 +266,7 @@ if __name__ == "__main__":
     validation_output = work_directory + "larcv/larcv_validation_set/"
     rewrite_output = False   # True: overwrite existing output files
     TRAIN_FRACTION = 0.8     # fraction of the usable file pairs written to training; the rest go to validation
-    N_FILES = 2           # int: only use the first N_FILES *.TMSRECO.root files (sorted by name); None: all
+    N_FILES = None           # int: only use the first N_FILES *.TMSRECO.root files (sorted by name); None: all
     VERBOSE = False
 
     os.makedirs(training_output, exist_ok=True)
